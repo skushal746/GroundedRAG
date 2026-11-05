@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     rrf_k: int = 60
     final_top_k: int = 5
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-    min_rerank_score: float = 0.10
+    min_rerank_score: float = 1e-4
 
     # --- generation ---
     llm_provider: LLMProvider = LLMProvider.OPENAI
