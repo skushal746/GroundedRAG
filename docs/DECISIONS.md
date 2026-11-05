@@ -49,8 +49,8 @@ disabled, top rerank scores were:
 So the score separates "about our product" from "not about our product" well, but it
 **cannot** separate "answerable" from "plausible but not covered". Any threshold high
 enough to catch those (≥ 0.63) would have refused about 40% of answerable questions. The
-threshold sits between the off-topic cluster and the lowest answerable score (about 3x margin
-each side). Plausible-but-unanswerable questions are handled by the next layers: the model's
+threshold sits between the off-topic cluster and the lowest answerable score (2.3x above the
+highest off-topic score, 3.7x below the lowest answerable one). Plausible-but-unanswerable questions are handled by the next layers: the model's
 structured `answerable=false`, then citation validation. With the gate off, those layers
 alone refused all 5 should-refuse questions and none of the 20 answerable ones.
 **Revisit when.** The knowledge base or the reranker changes. Re-run

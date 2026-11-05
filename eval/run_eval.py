@@ -45,7 +45,7 @@ from eval.metrics import (
 ROOT = Path(__file__).resolve().parent
 DATASET = ROOT / "dataset.yaml"
 REPORTS = ROOT / "reports"
-THRESHOLDS = [0.0, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5]
+THRESHOLDS = [0.0, 1e-5, 1e-4, 1e-3, 0.01, 0.05, 0.1, 0.2, 0.3, 0.5, 0.7]
 
 JUDGE_SYSTEM = """\
 You are a strict evaluator of a customer-support assistant. You are given a question, a
@@ -202,6 +202,7 @@ def summarize(results: list[QuestionResult]) -> dict[str, float]:
     latencies = [r.latency_ms for r in results]
     return {
         "n": len(results),
+        "hit_rate_at_1": mean([1.0 if r.hit_rank == 1 else 0.0 for r in answerable]),
         "hit_rate_at_5": mean([1.0 if r.hit_rank else 0.0 for r in answerable]),
         "mrr": mean([reciprocal_rank(r.hit_rank) for r in answerable]),
         "citation_accuracy": mean([1.0 if r.citation_hit else 0.0 for r in cited]),
@@ -221,6 +222,13 @@ def summarize(results: list[QuestionResult]) -> dict[str, float]:
 
 def _pct(v: float) -> str:
     return f"{v * 100:.0f}%"
+
+
+def _score(v: float | None) -> str:
+    """Readable rerank score: tiny values in scientific notation (the gate lives there)."""
+    if v is None:
+        return ""
+    return f"{v:.1e}" if v < 0.01 else f"{v:.3f}"
 
 
 def render_markdown(
@@ -246,6 +254,7 @@ def render_markdown(
         "|---" * (len(summaries) + 1) + "|",
     ]
     rows = [
+        ("Hit rate@1", "hit_rate_at_1", _pct),
         ("Hit rate@5", "hit_rate_at_5", _pct),
         ("MRR", "mrr", lambda v: f"{v:.3f}"),
         ("Citation accuracy", "citation_accuracy", _pct),
@@ -290,7 +299,7 @@ def render_markdown(
     ]
     for r in results:
         outcome = r.fallback_reason or "answered"
-        score = "" if r.top_rerank_score is None else f"{r.top_rerank_score:.3f}"
+        score = _score(r.top_rerank_score)
         lines.append(
             f"| {r.id} | {r.category} | {r.hit_rank or '-'} | "
             f"{'' if r.citation_hit is None else ('yes' if r.citation_hit else 'no')} | "
@@ -312,7 +321,7 @@ def render_markdown(
             [(r.top_rerank_score, r.expected_answerable) for r in rerank], THRESHOLDS
         ):
             lines.append(
-                f"| {row['threshold']:.2f} | {int(row['answerable_blocked'])} "
+                f"| {row['threshold']:g} | {int(row['answerable_blocked'])} "
                 f"({_pct(row['answerable_blocked_pct'])}) | {int(row['unanswerable_blocked'])} "
                 f"({_pct(row['unanswerable_blocked_pct'])}) |"
             )
@@ -320,9 +329,10 @@ def render_markdown(
         una = sorted(r.top_rerank_score or 0 for r in rerank if not r.expected_answerable)
         lines += [
             "",
-            f"- Lowest answerable top score: **{ans[0]:.3f}** "
-            f"(next: {', '.join(f'{s:.3f}' for s in ans[1:4])})",
-            f"- Unanswerable top scores: {', '.join(f'{s:.3f}' for s in una)}",
+            f"- Lowest answerable top score: **{_score(ans[0])}** "
+            f"(next: {', '.join(_score(s) for s in ans[1:4])})",
+            f"- Should-refuse top scores: {', '.join(_score(s) for s in una)}",
+            f"- Configured gate: `MIN_RERANK_SCORE={meta['min_rerank_score']:g}`",
         ]
 
     issues = [
@@ -350,6 +360,17 @@ def render_markdown(
             "",
         ]
     return "\n".join(lines) + "\n"
+
+
+def render_saved(path: Path) -> None:
+    """Re-render a Markdown report from its JSON (no LLM calls)."""
+    data = json.loads(path.read_text())
+    details = {m: [QuestionResult(**r) for r in rs] for m, rs in data["results"].items()}
+    summaries = {m: summarize(rs) for m, rs in details.items()}
+    md = render_markdown(data["meta"], summaries, details, list(details)[-1])
+    path.with_suffix(".md").write_text(md)
+    path.write_text(json.dumps({**data, "summary": summaries}, indent=2, default=str))
+    print(f"Re-rendered {path.with_suffix('.md')}")
 
 
 async def main_async(args: argparse.Namespace) -> None:
@@ -422,7 +443,12 @@ def main() -> None:
     parser.add_argument("--min-rerank-score", type=float, help="override the confidence gate")
     parser.add_argument("--only", help="comma-separated question ids")
     parser.add_argument("--name", help="report file name (default: timestamped)")
-    asyncio.run(main_async(parser.parse_args()))
+    parser.add_argument("--render", type=Path, help="re-render a saved JSON report and exit")
+    args = parser.parse_args()
+    if args.render:
+        render_saved(args.render)
+        return
+    asyncio.run(main_async(args))
 
 
 if __name__ == "__main__":
