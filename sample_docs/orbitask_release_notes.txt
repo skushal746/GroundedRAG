@@ -1,0 +1,38 @@
+Orbitask Release Notes
+======================
+
+Version 4.3 (1 March 2026)
+--------------------------
+Billing: the refund window for annual plans has been extended from 14 days to 30 days. The
+new window applies to annual purchases and renewals made on or after 1 March 2026.
+
+New: Workload view shows each member's assigned tasks per week so managers can rebalance
+work. Available on Business and Enterprise plans.
+
+API: v1 is now officially deprecated. It will be shut down on 31 December 2026.
+
+Version 4.2 (15 January 2026)
+-----------------------------
+Gantt view is now available on the Team plan. Previously it required Business or Enterprise.
+
+The monthly automation run allowance on the Team plan increased from 2,500 to 5,000 runs.
+
+Fixed: calendar view showed tasks one day early for workspaces in UTC-10 and UTC-11 time
+zones.
+
+Version 4.1 (20 October 2025)
+-----------------------------
+Recurring tasks support custom intervals such as "every 3rd weekday" or "last Friday of the
+month".
+
+Webhook deliveries are now retried up to 8 times (previously 5).
+
+Fixed: ORB-4091 lock errors were returned too often when two automations updated the same
+task at the same time.
+
+Version 4.0 (4 August 2025)
+---------------------------
+API v2 is generally available, with cursor pagination and per-workspace rate limits.
+
+Personal access tokens now expire after 90 days by default. Existing tokens created before
+4 August 2025 keep their original expiry.

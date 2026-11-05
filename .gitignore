@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+eval/reports/*.json
+!eval/reports/sample_report.json
+.DS_Store
