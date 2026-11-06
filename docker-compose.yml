@@ -20,6 +20,10 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://groundedrag:groundedrag@postgres:5432/groundedrag
+      # Ollama runs on the host; "localhost" inside the container is the container itself.
+      OLLAMA_BASE_URL: ${OLLAMA_DOCKER_BASE_URL:-http://host.docker.internal:11434/v1}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # needed on Linux; Docker Desktop provides it already
     ports:
       - "${API_HOST_PORT:-8000}:8000"
     depends_on:

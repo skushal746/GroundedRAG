@@ -129,6 +129,35 @@ def test_build_llm_client_by_provider() -> None:
     assert isinstance(an, AnthropicClient) and an.model == "claude-haiku-5-5"
 
 
+def test_missing_cloud_key_falls_back_to_ollama() -> None:
+    for provider in (LLMProvider.OPENAI, LLMProvider.ANTHROPIC):
+        s = make_settings(
+            llm_provider=provider,
+            llm_model="gpt-4.1",
+            ollama_model="qwen-x",
+            openai_api_key="",  # override any key exported in the shell
+            anthropic_api_key="",
+            ollama_base_url="http://localhost:11434/v1",
+        )
+        assert s.effective_llm_provider is LLMProvider.OLLAMA and s.llm_fell_back_to_ollama
+        client = build_llm_client(s)
+        assert isinstance(client, OpenAIClient) and client.model == "qwen-x"
+        assert str(client._client.base_url).startswith("http://localhost:11434/v1")
+    # Explicit ollama: default model, LLM_MODEL honoured, not reported as a fallback.
+    s = make_settings(llm_provider=LLMProvider.OLLAMA)
+    assert s.resolved_llm_model == "Qwen3-Coder:latest" and not s.llm_fell_back_to_ollama
+    assert make_settings(llm_provider=LLMProvider.OLLAMA, llm_model="m").resolved_llm_model == "m"
+    # A key present: no fallback.
+    s = make_settings(llm_provider=LLMProvider.ANTHROPIC, anthropic_api_key="k")
+    assert s.effective_llm_provider is LLMProvider.ANTHROPIC
+
+
+async def test_ollama_errors_are_labelled() -> None:
+    client = OpenAIClient("m", "ollama", label="Ollama", base_url="http://127.0.0.1:9/v1")
+    with pytest.raises(LLMError, match="Ollama request failed"):
+        await client.complete("sys", MSGS)
+
+
 async def test_query_rewriter() -> None:
     rewriter = QueryRewriter(FakeLLM(text_responses=['"What is the annual refund window?"\nextra']))
     assert (await rewriter.rewrite("and annual?", [])).query == "and annual?"

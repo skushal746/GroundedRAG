@@ -19,6 +19,7 @@ class RetrievalMode(StrEnum):
 class LLMProvider(StrEnum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
+    OLLAMA = "ollama"
     FAKE = "fake"
 
 
@@ -31,6 +32,7 @@ class EmbeddingProvider(StrEnum):
 DEFAULT_LLM_MODELS: dict[LLMProvider, str] = {
     LLMProvider.OPENAI: "gpt-4.1-mini",
     LLMProvider.ANTHROPIC: "claude-sonnet-5-5",
+    LLMProvider.OLLAMA: "Qwen3-Coder:latest",
     LLMProvider.FAKE: "fake-llm",
 }
 
@@ -77,6 +79,11 @@ class Settings(BaseSettings):
     llm_timeout_s: float = 30.0
     openai_api_key: SecretStr = SecretStr("")
     anthropic_api_key: SecretStr = SecretStr("")
+    # Local Ollama server (OpenAI-compatible API). Used when LLM_PROVIDER=ollama, and as an
+    # automatic fallback when LLM_PROVIDER is openai/anthropic but that provider's key is empty.
+    ollama_base_url: str = "http://localhost:11434/v1"
+    ollama_model: str = DEFAULT_LLM_MODELS[LLMProvider.OLLAMA]
+    ollama_timeout_s: float = 120.0
 
     # --- conversation ---
     history_turns: int = 3
@@ -91,9 +98,34 @@ class Settings(BaseSettings):
         return None if value == "" else value
 
     @property
+    def effective_llm_provider(self) -> LLMProvider:
+        """The provider actually used: openai/anthropic without an API key fall back to Ollama."""
+        if self.llm_provider is LLMProvider.OPENAI and not self.openai_api_key.get_secret_value():
+            return LLMProvider.OLLAMA
+        if (
+            self.llm_provider is LLMProvider.ANTHROPIC
+            and not self.anthropic_api_key.get_secret_value()
+        ):
+            return LLMProvider.OLLAMA
+        return self.llm_provider
+
+    @property
+    def llm_fell_back_to_ollama(self) -> bool:
+        return self.effective_llm_provider is not self.llm_provider
+
+    @property
     def resolved_llm_model(self) -> str:
-        """The configured model, or the provider's sensible default."""
-        return self.llm_model or DEFAULT_LLM_MODELS[self.llm_provider]
+        """The configured model, or the provider's sensible default.
+
+        On the Ollama fallback, LLM_MODEL (meant for the cloud provider) is ignored in favour
+        of OLLAMA_MODEL.
+        """
+        provider = self.effective_llm_provider
+        if provider is LLMProvider.OLLAMA:
+            if self.llm_provider is LLMProvider.OLLAMA and self.llm_model:
+                return self.llm_model
+            return self.ollama_model
+        return self.llm_model or DEFAULT_LLM_MODELS[provider]
 
     @property
     def api_key_set(self) -> frozenset[str]:

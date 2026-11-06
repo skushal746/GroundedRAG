@@ -44,7 +44,10 @@ flowchart LR
 
 ## 1. Quickstart
 
-Requirements: Docker, [uv](https://docs.astral.sh/uv/), and an OpenAI or Anthropic API key.
+Requirements: Docker, [uv](https://docs.astral.sh/uv/), and an OpenAI or Anthropic API key,
+**or** a local [Ollama](https://ollama.com) with the `Qwen3-Coder` model (`ollama pull qwen3-coder`).
+If the key for the configured provider is empty, GroundedRAG falls back to Ollama automatically
+and logs `llm_fallback_to_ollama` at startup.
 
 ```bash
 cp .env.example .env              # then set OPENAI_API_KEY (and change API_KEYS)
@@ -397,12 +400,15 @@ All settings are environment variables (also read from `.env`). See [`.env.examp
 | `MAX_UPLOAD_MB` | `20` | Upload size limit (HTTP 413 above it) |
 | `DATABASE_URL` | `postgresql+asyncpg://groundedrag:groundedrag@localhost:5433/groundedrag` | Async SQLAlchemy URL. docker-compose overrides it for the API container. |
 | `DB_POOL_SIZE` | `5` | Connection pool size |
-| `LLM_PROVIDER` | `openai` | `openai`, `anthropic`, or `fake` (offline stub) |
-| `LLM_MODEL` | *(provider default)* | `gpt-4.1-mini` for OpenAI, `claude-sonnet-5-5` for Anthropic |
+| `LLM_PROVIDER` | `openai` | `openai`, `anthropic`, `ollama`, or `fake` (offline stub). `openai`/`anthropic` without their API key fall back to `ollama`. |
+| `LLM_MODEL` | *(provider default)* | `gpt-4.1-mini` for OpenAI, `claude-sonnet-5-5` for Anthropic. Ignored on the Ollama fallback. |
 | `LLM_TEMPERATURE` | `0` | Sampling temperature. Empty = don't send (for models that only accept the default). Not sent to Anthropic. |
 | `LLM_MAX_TOKENS` | `800` | Max output tokens for the answer |
 | `LLM_TIMEOUT_S` | `30` | Per-request LLM timeout; on expiry the turn falls back with `llm_error` |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | *(empty)* | Provider credentials |
+| `OLLAMA_BASE_URL` | `http://localhost:11434/v1` | Ollama's OpenAI-compatible endpoint. docker-compose sets `http://host.docker.internal:11434/v1` for the API container (override with `OLLAMA_DOCKER_BASE_URL`). |
+| `OLLAMA_MODEL` | `Qwen3-Coder:latest` | Ollama model used by `LLM_PROVIDER=ollama` and by the fallback |
+| `OLLAMA_TIMEOUT_S` | `120` | Per-request timeout for Ollama (local models are slower; the first call loads the model) |
 | `EMBEDDING_PROVIDER` | `local` | `local` (sentence-transformers), `openai`, or `fake` |
 | `EMBEDDING_MODEL` | `BAAI/bge-small-en-v1.5` | Local embedding model (baked into the Docker image) |
 | `EMBEDDING_DIM` | `384` | Vector size. Must match the model **and** the pgvector column (fixed at first migration). |

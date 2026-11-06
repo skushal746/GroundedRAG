@@ -1,4 +1,6 @@
-"""OpenAI chat-completions client with JSON-schema structured outputs."""
+"""OpenAI chat-completions client with JSON-schema structured outputs.
+
+Also used for Ollama, which serves the same API (pass `base_url`)."""
 
 from typing import Any
 
@@ -21,12 +23,15 @@ class OpenAIClient:
         *,
         timeout_s: float = 30.0,
         temperature: float | None = 0.0,
+        base_url: str | None = None,
+        label: str = "OpenAI",
         client: Any | None = None,
     ) -> None:
         self.model = model
         self._temperature = temperature
+        self._label = label
         self._client = client or openai.AsyncOpenAI(
-            api_key=api_key, timeout=timeout_s, max_retries=1
+            api_key=api_key, base_url=base_url, timeout=timeout_s, max_retries=1
         )
 
     async def _create(
@@ -48,7 +53,7 @@ class OpenAIClient:
                 model=self.model, messages=payload, max_completion_tokens=max_tokens, **extra
             )
         except openai.OpenAIError as exc:
-            raise LLMError(f"OpenAI request failed: {type(exc).__name__}: {exc}") from exc
+            raise LLMError(f"{self._label} request failed: {type(exc).__name__}: {exc}") from exc
         choice = response.choices[0]
         if getattr(choice.message, "refusal", None):
             raise LLMError(f"Model refused: {choice.message.refusal}")

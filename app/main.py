@@ -38,12 +38,21 @@ def create_app(settings: Settings | None = None, components: Components | None =
             "startup",
             extra={
                 "database_ok": db_ok,
-                "llm_provider": settings.llm_provider,
+                "llm_provider": settings.effective_llm_provider,
                 "llm_model": built.llm.model,
                 "retrieval_mode": settings.retrieval_mode,
                 "min_rerank_score": settings.min_rerank_score,
             },
         )
+        if settings.llm_fell_back_to_ollama:
+            log.warning(
+                "llm_fallback_to_ollama: no API key for the configured provider",
+                extra={
+                    "configured_provider": settings.llm_provider,
+                    "ollama_base_url": settings.ollama_base_url,
+                    "llm_model": built.llm.model,
+                },
+            )
         if not settings.api_key_set:
             log.warning("no_api_keys_configured: every authenticated request will be rejected")
         yield
